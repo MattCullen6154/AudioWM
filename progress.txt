@@ -1,0 +1,143 @@
+Progress Summary
+================
+
+Current state
+-------------
+- The main workflow lives in `123Final.ipynb`.
+- The notebook currently implements a spread-spectrum watermarking prototype for speech/audio.
+- Audio is framed with:
+  - `FRAME_MS = 20`
+  - `HOP_MS = 10`
+  - `NFFT = 1024`
+- The frequency region used for watermarking is:
+  - `FREQ_LOW = 600 Hz`
+  - `FREQ_HIGH = 2500 Hz`
+- The current example payload is:
+  - `WATERMARK_BITS = [1, 0, 0, 1, 0, 0, 1, 0]`
+- The current embedding strength / repetition settings are:
+  - `EMBED_STRENGTH = 0.5`
+  - `BIT_REPEAT = 4`
+
+
+What has been achieved so far
+-----------------------------
+1. Basic embed/decode pipeline exists.
+   - Audio is loaded, normalized, framed, FFT'd, watermarked, reconstructed, distorted, and decoded.
+
+2. Windowing / overlap-add path is working.
+   - The notebook uses a Hann analysis/synthesis window with overlap-add normalization.
+
+3. Watermarking was improved relative to the earliest version.
+   - Embedding is limited to energetic frames rather than simply the first frames.
+   - Decoder subtracts stored per-frame baseline scores from metadata.
+
+4. Oracle-assisted decoding works reliably in the current notebook.
+   - The current decoder receives metadata from the embedder and can decode the example watermark successfully under the current test settings.
+
+5. Batch sweep / shared-key experiments were separated out.
+   - Experimental code for sweeps and shared-key ideas was moved into `scratchpad.py` so the notebook remains focused on the core oracle model.
+
+
+What the current notebook is really testing
+-------------------------------------------
+The current decoder is not yet a realistic independent receiver.
+
+It is "oracle-assisted" because the embedder returns metadata, and the decoder uses that metadata directly. In particular, the decoder currently gets:
+- the exact selected frequency bins
+- the spreading code
+- the frame indices used for embedding
+- baseline per-frame correlation values derived from the clean/original host signal
+
+This is useful for:
+- checking whether the embed/read math works
+- measuring an upper bound on decoder performance
+- debugging the watermark mechanism itself
+
+It is not yet a true shared-protocol test because the decoder does not independently discover:
+- where the transmission starts
+- which frame stream contains payload symbols
+- how to synchronize to repeated payload structure
+
+
+Main gap to the final goal
+--------------------------
+Goal: a shared protocol with an independent encoder and decoder pair.
+
+That means:
+- the encoder and decoder may share protocol rules and a secret key/seed ahead of time
+- but during operation they do not exchange embedding-time metadata
+- the decoder must recover synchronization from the received audio alone
+
+Right now, the main missing capability is synchronization.
+
+
+Steps remaining
+---------------
+1. Replace oracle metadata with shared protocol parameters.
+   The final encoder/decoder should share only things like:
+   - frame/hop/nfft settings
+   - frequency band
+   - shared secret seed / key
+   - packet format
+   - payload length
+   - preamble definition
+
+   The decoder should not be handed:
+   - `frame_indices`
+   - `baseline_scores`
+   - embed-time `selected_bins` directly unless they are regenerated from the shared key
+
+2. Define a packet structure.
+   Likely form:
+   - `[preamble][payload][optional end marker]`
+   repeated across the audio
+
+3. Make the packet repeat through the usable frame stream.
+   Instead of embedding a single short payload once, embed the packet repeatedly across the energetic-frame sequence.
+
+4. Design a deterministic key schedule.
+   The encoder and decoder should both regenerate:
+   - selected bins
+   - spreading code
+   from the same key seed and protocol settings.
+
+5. Add preamble detection.
+   The decoder should:
+   - compute frame-level scores from received audio
+   - slide a correlation detector over those scores
+   - detect peaks corresponding to the known preamble
+
+6. Decode payload relative to detected preamble positions.
+   After a preamble peak is found, the decoder should read the next payload section according to packet length.
+
+7. Combine multiple packet decodes.
+   Because the packet repeats across the audio, the decoder can:
+   - decode several candidate packets
+   - majority vote each bit
+   - reject weak packet detections
+
+8. Re-evaluate distortion robustness under the independent-decoder model.
+   The oracle model may succeed while the independent model fails.
+   Distortion testing should be repeated after synchronization is implemented.
+
+
+Suggested near-term plan
+------------------------
+1. Keep the current oracle notebook as a debug baseline.
+2. Prototype the realistic independent decoder path in `scratchpad.py`.
+3. Implement:
+   - shared-key bin/code regeneration
+   - repeated packet embedding
+   - preamble detector
+   - packet-level majority vote
+4. Compare oracle BER vs independent BER on the same audio and distortion settings.
+5. Once stable, move the realistic shared-protocol design back into the notebook.
+
+
+Success criterion
+-----------------
+The project reaches its intended goal when:
+- the decoder only uses shared protocol rules plus received audio
+- the decoder no longer depends on embed-time metadata
+- the decoder can detect packet starts from a preamble
+- the decoder can recover the payload robustly after channel distortions
