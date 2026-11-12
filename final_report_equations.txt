@@ -1,0 +1,99 @@
+\section*{Core Equations}
+
+\subsection*{Framing and STFT}
+\[
+L = \mathrm{round}\!\left(\frac{T_f}{1000} f_s\right),
+\qquad
+H = \mathrm{round}\!\left(\frac{T_h}{1000} f_s\right)
+\]
+
+\[
+x_m[n] = x[mH+n],
+\qquad 0 \le n < L
+\]
+
+\[
+w[n] = \tfrac{1}{2}\left(1 - \cos\left(\frac{2\pi n}{L}\right)\right)
+\]
+
+\[
+X_m[k] = \sum_{n=0}^{L-1} x[mH+n] \, w[n] \, e^{-j 2\pi kn / N_{\mathrm{FFT}}}
+\]
+
+\subsection*{Spread-Spectrum Embedding Rule}
+\[
+b \in \{0,1\}
+\quad \longrightarrow \quad
+s = 2b - 1 \in \{-1,+1\}
+\]
+
+\[
+\mu_m[k] = \mathbf{1}\!\left\{|X_m[k]| > 0.05 \max_{u \in \mathcal{K}} |X_m[u]|\right\}
+\]
+
+\[
+A_m =
+\begin{cases}
+\dfrac{\sum_{u \in \mathcal{K}} \mu_m[u] |X_m[u]|}{\sum_{u \in \mathcal{K}} \mu_m[u]}, & \text{if any active bins exist} \\
+\dfrac{1}{|\mathcal{K}|} \sum_{u \in \mathcal{K}} |X_m[u]|, & \text{otherwise}
+\end{cases}
+\]
+
+\[
+\Delta_m[k] = \alpha_m \, s_m \, c[k] \, A_m \, \mu_m[k]
+\]
+
+\[
+|X'_m[k]| = \max\Bigl(0,\, |X_m[k]| + \Delta_m[k]\Bigr)
+\]
+
+\[
+X'_m[k] = |X'_m[k]| e^{j \angle X_m[k]}
+\]
+
+\subsection*{Detector Score}
+\[
+\rho_m = \frac{1}{|\mathcal{K}|}
+\sum_{k \in \mathcal{K}}
+\Bigl(|Y_m[k]| - \overline{|Y_m|}\Bigr)c[k]
+\]
+
+\subsection*{Preamble Correlation and Synchronization}
+\[
+\tilde{\rho}_m =
+\frac{\rho_m}
+{\sqrt{\frac{1}{M}\sum_{q=0}^{M-1}\rho_q^2} + 10^{-12}}
+\]
+
+\[
+\Gamma[t] =
+\sum_{i=0}^{L_p-1}
+\Bigl(\tilde{\rho}_{t+i} - \overline{\tilde{\rho}}_{t:t+L_p-1}\Bigr)
+\Bigl(p[i] - \overline{p}\Bigr)
+\]
+
+\[
+\Gamma[t] \ge \mu_{\Gamma} + \kappa \sigma_{\Gamma}
+\]
+
+\[
+\beta_j^{(t)} =
+\sum_{r=0}^{R-1}
+\rho_{t + \delta + L_p + jR + r}
+\]
+
+\[
+\hat{b}_j^{(t)} =
+\begin{cases}
+1, & \beta_j^{(t)} > 0 \\
+0, & \beta_j^{(t)} \le 0
+\end{cases}
+\]
+
+\subsection*{Bit Error Rate}
+\[
+\mathrm{BER} =
+\frac{1}{N_b}
+\sum_{j=0}^{N_b-1}
+\mathbf{1}\!\left\{\hat{b}_j \ne b_j\right\}
+\]
